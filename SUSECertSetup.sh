@@ -288,9 +288,11 @@ else
                 "Module-Web-Scripting"        # Name: Web-Scripting-Module 15.6-0  ID: sle-module-web-scripting
             )
             ISO_PATH=/home/iso/$OS_FILENAME_15SP6
+            MOUNT_POINT=/run/media/root
+            mount "$ISO_PATH" "$MOUNT_POINT"
             for module in "${MODULES[@]}"; do
                 module_ID="${MODULE_ID[$module]}"
-                zypper ar "iso:/?iso=${ISO_PATH}&path=/${module}" ${module_ID}
+                zypper ar "dir:${MOUNT_POINT}/${module}" ${module_ID}
             done
             ;;
         "2") # 15 SP5
@@ -332,11 +334,13 @@ else
                 "Module-Server-Applications"  # Name: Server-Applications-Module 15.5-0  ID: sle-module-server-applications
                 "Module-Transactional-Server" # Name: Transactional-Server-Module 15.5-0  ID: sle-module-transactional-server
                 "Module-Web-Scripting"        # Name: Web-Scripting-Module 15.5-0  ID: sle-module-web-scripting
-			)
+            )
             ISO_PATH=/home/iso/$OS_FILENAME_15SP5
+            MOUNT_POINT=/run/media/root
+            mount "$ISO_PATH" "$MOUNT_POINT"
             for module in "${MODULES[@]}"; do
                 module_ID="${MODULE_ID[$module]}"
-                zypper ar "iso:/?iso=${ISO_PATH}&path=/${module}" ${module_ID}
+                zypper ar "dir:${MOUNT_POINT}/${module}" ${module_ID}
             done
             ;;
         esac
@@ -349,7 +353,9 @@ else
 			
         # List products	     
         zypper pd
-
+        
+        # Unmount OS ISO
+        # umount "$MOUNT_POINT" 2> /dev/null
 		   
         # Mount SCK tool ISO
         iso_file=$(find "/home/tools/Current_SCK" -name "*.iso") 
