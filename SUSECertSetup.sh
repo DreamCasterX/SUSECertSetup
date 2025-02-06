@@ -2,41 +2,80 @@
 
 
 # CREATOR: Mike Lu (klu7@lenovo.com)
-# CHANGE DATE: 1/17/2025
+# CHANGE DATE: 2/6/2025
 __version__="1.0"
 
 
 # SUSE Enterprise Linux Server Hardware Certification Test Environment Setup Script
+# [Note] The OS version on TC MUST be older than SUT (for example: TC: 15-SP5   SUT: 15-SP6)
+
+# Prerequisites for TC:
+# Boot to GM ISO
+#    a) Select "SUSE Linux Enterprise Server" to install
+#    b) Skip Registration
+#    c) Select the following 5 modules/extensions
+#         - Basesystem Module
+#         - Desktop Application Module
+#         - Development Tools Module
+#         - SUSE Linux Enterprise Workstation Extension
+#         - Server Application Module
+#    d) Skip User creation
+#    e) Set root password: suse
+# Boot to OS
+#    a) Put all the tools (OS ISO/product.zip/Current_SCK.zip) to the same directory as this script
+
+# Prerequisites for SUT:
+# PXE boot to TC
+#    a) Select "Server single disk automated install"
 
 
-SCK='http://sdk.suse.com/ndk/systest/builds/current/Current_SCK.zip'
-Products='http://sdk.suse.com/ndk/certfiles/products.zip'
 
+# User-defined settings
+TIME_ZONE='Asia/Taipei'
+SCK_URL='http://sdk.suse.com/ndk/systest/builds/current/Current_SCK.zip'
+Products_URL='http://sdk.suse.com/ndk/certfiles/products.zip'
+SCK_FILENAME="Current_SCK.zip"
+Products_FILENAME="products.zip"
+OS_FILENAME_15SP5="SLE-15-SP5-Full-x86_64-GM-Media1.iso"
+OS_FILENAME_15SP6="SLE-15-SP6-Full-x86_64-GM-Media1.iso"
+
+
+# Fixed settings
+red='\e[41m'
+green='\e[32m'
+yellow='\e[93m'
+nc='\e[0m'
 
 
 # Ensure the user is running the script as root
 if [ "$EUID" -ne 0 ]; then 
-    echo "⚠️ Please run as root (sudo su) to start the installation."
+    echo -e "${yellow}Please run as root (sudo su) to start the installation.${nc}"
 
 else
-
     # Customize keyboard shortcut
-    OS_VERSION=`cat /etc/os-release | grep ^VERSION_ID= | awk -F= '{print $2}' | cut -d '"' -f2`
+    TC_OS_VER=`cat /etc/os-release | grep ^VERSION_ID= | awk -F= '{print $2}' | cut -d '"' -f2`
     ID=`id -u $USERNAME`
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/','/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/']"
+
   
     # Open Terminal (Ctrl+Alt+T)
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ name 'Terminal'     
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ command 'gnome-terminal' 
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ binding '<ctrl><alt>t' 
 
+
     # Enable dark mode
-	sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+    if [[ $TC_OS_VER == '15.6' ]]; then 
+        sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+    elif [[ $TC_OS_VER == '15.5' ]]; then 
+        dconf write /org/gnome/desktop/interface/gtk-theme "'Adwaita-dark'"
+    fi
 	
     # Open Current folder (Super+E)
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/ name 'Current folder' 
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/ command 'nautilus .' 
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/ binding '<super>e' 
+
   
     # Open Settings (Super+I)
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/ name 'Settings' 
@@ -45,62 +84,405 @@ else
 
 
     # Set proxy to automatic
-    # sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.system.proxy mode 'auto' 2> /dev/null
+    sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.system.proxy mode 'auto' 2> /dev/null
 
 
     # Disable auto suspend/dim screen/screen blank/auto power-saver
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type "nothing" 2> /dev/null
-    # sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type "nothing" 2> /dev/null
+    sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type "nothing" 2> /dev/null
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.power idle-dim "false" 2> /dev/null
     sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.desktop.session idle-delay "0" > /dev/null 2> /dev/null
-    # sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.power power-saver-profile-on-low-battery "false" 2> /dev/null
+    sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.settings-daemon.plugins.power power-saver-profile-on-low-battery "false" 2> /dev/null
 
 
     # Show battery percentage
-    # sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.desktop.interface show-battery-percentage "true" 2> /dev/null
+    sudo -H -u $USERNAME DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$ID/bus gsettings set org.gnome.desktop.interface show-battery-percentage "true" 2> /dev/null
 
-  
-    # Set time zone and reset NTP
-    timedatectl set-timezone Asia/Taipei
+
+    # Enable SSH and disable firewall
+    ! systemctl status sshd | grep 'running' > /dev/null && systemctl enable sshd && systemctl start sshd
+    systemctl status firewalld | grep 'running' > /dev/null && systemctl stop firewalld && systemctl disable firewalld
+ 
+ 
+    # Set local time zone and reset NTP
+    timedatectl set-timezone $TIME_ZONE
     timedatectl set-ntp 0 && sleep 1 && timedatectl set-ntp 1
 
 
     # Ensure Internet is connected
-    nslookup "google.com" > /dev/null
-    if [ $? != 0 ]; then 
-        echo "❌ No Internet connection! Please check your network" && sleep 5 && exit 1
-    fi
+    CheckInternet() {
+        nslookup "google.com" > /dev/null
+        if [ $? != 0 ]; then 
+            echo -e "${red}No Internet connection! Please check your network${nc}" && sleep 5 && exit 1
+        fi
+    }
+    #CheckInternet
 
 
-    # Configure required tools
-    mkdir -p /home/iso /home/tools /home/cdrom
-	[[ ! -f /home/tools/Current_SCK.zip ]] && wget -P /home/tools $SCK
-	[[ ! -f /home/tools/products.zip ]] && wget -P /home/tools $Products
-
+    # Get system type from user
+    echo "╭───────────────────────────────────────────────────────╮"
+    echo "│    SLES YES Certification Test Environment Setup      │"
+    echo "╰───────────────────────────────────────────────────────╯"
+    echo "Are you setting up a SUT or TC?"
+    read -p "(s)SUT  (t)TC: " TYPE
+    while [[ "$TYPE" != [SsTt] ]]; do 
+        read -p "(s)SUT  (t)TC: " TYPE
+    done   
     
-	# Delete unwanted repos
-	while true; do
-	    REPOS=`zypper lr | grep -v -E '^[[:space:]]*$|^[R#-]' | wc -l`
-	    if [[ $REPOS -gt 0 ]]; then
-	        for REPO in $(seq 1 $REPOS); do
-	            zypper rr $REPO
-			done
-		else
-		    break
-		fi
-	done
-	zypper lr # 檢查repo
-	zypper rr # 刪除repo
 	
-	
-	zypper clean
-	zypper ref
-	zypper pd
-	
-	mount 测试工具.iso /home/cdrom/
-	bash  /home/cdrom/sck_install.sh
-	
+    #================ TC ===================
+    if [[ "$TYPE" == [Tt] ]]; then
+        echo "Which OS version are you going to certify for SUT?"
+        read -p "(1)15 SP6  (2)15 SP5: " SUT_OS_VER
+        while [[ "$SUT_OS_VER" != [12] ]]; do 
+            read -p "(1)15 SP6  (2)15 SP5: " SUT_OS_VER
+        done
 
+
+        # Set hostname for TC
+        ! hostname | grep 'TC' > /dev/null && hostnamectl set-hostname 'TC' 
+
+	
+        # Set IP and netmask for TC
+        echo
+        echo "-----------------------------"
+        echo "CONFIGURING TC NETWORK IP...."
+        echo "-----------------------------"
+        echo
+        declare -A ip_addresses=(
+	    ["eth0"]="10.1.1.2"
+	    ["eth1"]="10.1.2.2"
+	    ["eth2"]="10.1.3.2"
+	    ["eth3"]="10.1.4.2"
+        )
+        NETMASK="24"
+        for interface in eth0 eth1 eth2 eth3; do 
+            if ip a | grep -q $interface; then
+                CONFIG_FILE="/etc/sysconfig/network/ifcfg-$interface"
+                IPADDR=${ip_addresses[$interface]}  
+                # Check if the IP and netmask have been correctly set to avoid repeating
+                if [[ -f "$CONFIG_FILE" ]]; then
+                    current_ip=$(cat "$CONFIG_FILE" | grep 'IPADDR' | awk -F "'" '{print $2}')
+                    if [[ "$current_ip" == "$IPADDR/$NETMASK" ]]; then
+                        continue
+                    else
+                        rm -f "$CONFIG_FILE"
+                    fi
+                fi
+                echo "Configuring $interface with IP $IPADDR" 
+                echo "IPADDR='$IPADDR/$NETMASK'" | sudo tee -a "$CONFIG_FILE" > /dev/null
+                echo "BOOTPROTO='static'" | sudo tee -a "$CONFIG_FILE" > /dev/null
+                echo "STARTMODE='auto'" | sudo tee -a "$CONFIG_FILE" > /dev/null
+                sudo systemctl restart network
+            fi
+        done
+
+        # Move or download required tools
+        echo
+        echo "----------------------"
+        echo "LOCATING TEST TOOLS..."
+        echo "----------------------"
+        echo
+        mkdir -p /home/iso /home/tools /home/cdrom
+        if [[ ! -f /home/tools/$SCK_FILENAME ]]; then
+            if [[ -f ./$SCK_FILENAME ]]; then
+                mv ./$SCK_FILENAME /home/tools/
+            else
+                wget -P /home/tools $SCK_URL
+            fi
+        fi
+        if [[ ! -f /home/tools/$Products_FILENAME ]]; then
+            if [[ -f ./$Products_FILENAME ]]; then
+                mv ./$Products_FILENAME /home/tools/
+            else
+                wget -P /home/tools $Products_URL
+            fi
+        fi
+        if [[ $SUT_OS_VER == "1" ]]; then
+            if [[ ! -f /home/iso/$OS_FILENAME_15SP6 ]]; then
+                if [[ -f ./$OS_FILENAME_15SP6 ]]; then
+                    mv ./$OS_FILENAME_15SP6 /home/iso/
+                else
+                    echo -e "${yellow}Please put the OS ISO file to the same directory as this script.${nc}"
+                    exit 1
+                fi
+            fi
+        elif [[ $SUT_OS_VER == "2" ]]; then
+            if [[ ! -f /home/iso/$OS_FILENAME_15SP5 ]]; then
+                if [[ -f ./$OS_FILENAME_15SP5 ]]; then
+                    mv ./$OS_FILENAME_15SP5 /home/iso/
+                else
+                    echo -e "${yellow}Please put the OS ISO file to the same directory as this script.${nc}"
+                    exit 1
+                fi
+            fi
+        fi
+	
+	
+        # Unzip SCK.zip and products.zip files
+        find "/home/tools/" -name "*.zip" -exec unzip -q -o {} -d "/home/tools/" \;
+        
+        # Delete unwanted repos (List repo: zypper lr   Remove repo: zypper rr) 
+        echo
+        echo "-----------------------------------"
+        echo "DELETING UNWANTED SOFTWARE REPOS..."
+        echo "-----------------------------------"
+        echo
+        while true; do
+            REPOS=`zypper lr | grep -v -E '^[[:space:]]*$|^[R#-]' | grep -vE "(No repositories defined|Use the 'zypper addrepo' command)" | wc -l`
+            if [[ $REPOS -gt 0 ]]; then
+                for REPO in $(seq 1 $REPOS); do
+                    zypper rr $REPO 2> /dev/null
+                done
+            else
+                break
+            fi
+        done
+		
+		
+        # Add local ISO image to repo
+        echo
+        echo "--------------------------"
+        echo "UPDATING SOFTWARE REPOS..."
+        echo "--------------------------"
+        echo
+        case $SUT_OS_VER in		
+        "1") # 15 SP6
+            declare -A MODULE_ID
+            MODULE_ID=(
+                ["Module-Basesystem"]="sle-module-basesystem"
+                ["Module-Containers"]="sle-module-containers"
+                ["Module-Desktop-Applications"]="sle-module-desktop-applications"
+                ["Module-Development-Tools"]="sle-module-development-tools"
+                ["Module-HPC"]="sle-module-hpc"
+                ["Module-Legacy"]="sle-module-legacy"
+                ["Module-Live-Patching"]="sle-module-live-patching"
+                ["Module-Public-Cloud"]="sle-module-public-cloud"
+                ["Module-Python3"]="sle-module-python3"
+                ["Module-SAP-Applications"]="sle-module-sap-applications"
+                ["Module-SAP-Business-One"]="sle-module-sap-business-one"
+                ["Product-HA"]="sle-ha"
+                ["Product-WE"]="sle-we"
+                ["Module-RT"]="sle-module-rt"
+                ["Module-Server-Applications"]="sle-module-server-applications"
+                ["Module-Transactional-Server"]="sle-module-transactional-server"
+                ["Module-Web-Scripting"]="sle-module-web-scripting"
+            )
+            MODULES=(
+                "Module-Basesystem"           # Name: Basesystem-Module 15.6-0   ID: sle-module-basesystem
+                "Module-Containers"           # Name: Containers-Module 15.6-0  ID: sle-module-containers
+                "Module-Desktop-Applications" # Name: Desktop-Applications-Module 15.6-0  ID: sle-module-desktop-applications
+                "Module-Development-Tools"    # Name: Development-Tools-Module 15.6-0  ID: sle-module-development-tools
+                "Module-HPC"                  # Name: HPC-Module 15.6-0  ID: sle-module-hpc
+                "Module-Legacy"               # Name: Legacy-Module 15.6-0  ID: sle-module-legacy
+                "Module-Live-Patching"        # Name: Live-Patching-Module 15.6-0  ID: sle-module-live-patching
+                "Module-Public-Cloud"         # Name: Public-Cloud-Module 15.6-0  ID: sle-module-public-cloud
+                "Module-Python3"              # Name: Python3-Module 15.6-0  ID: sle-module-python3
+                "Module-SAP-Applications"     # Name: SAP-Applications-Module 15.6-0  ID: sle-module-sap-applications
+                "Module-SAP-Business-One"     # Name: SAP-Business-One-Module 15.6-0  ID: sle-module-sap-business-one
+                "Product-HA"                  # Name: SLEHA15-SP6 15.6-0  ID: sle-ha
+                "Product-WE"                  # Name: SLEWE15-SP6 15.6-0  ID: sle-we
+                "Module-RT"                   # Name: SUSE-Real-Time-Module 15.6-0  ID: sle-module-rt
+                "Module-Server-Applications"  # Name: Server-Applications-Module 15.6-0  ID: sle-module-server-applications
+                "Module-Transactional-Server" # Name: Transactional-Server-Module 15.6-0  ID: sle-module-transactional-server
+                "Module-Web-Scripting"        # Name: Web-Scripting-Module 15.6-0  ID: sle-module-web-scripting
+            )
+            ISO_PATH=/home/iso/$OS_FILENAME_15SP6
+            for module in "${MODULES[@]}"; do
+                module_ID="${MODULE_ID[$module]}"
+                zypper ar "iso:/?iso=${ISO_PATH}&path=/${module}" ${module_ID}
+            done
+            ;;
+        "2") # 15 SP5
+            declare -A MODULE_ID
+            MODULE_ID=(
+                ["Module-Basesystem"]="sle-module-basesystem"
+                ["Module-Containers"]="sle-module-containers"
+                ["Module-Desktop-Applications"]="sle-module-desktop-applications"
+                ["Module-Development-Tools"]="sle-module-development-tools"
+                ["Module-HPC"]="sle-module-hpc"
+                ["Module-Legacy"]="sle-module-legacy"
+                ["Module-Live-Patching"]="sle-module-live-patching"
+                ["Module-Public-Cloud"]="sle-module-public-cloud"
+                ["Module-Python3"]="sle-module-python3"
+                ["Module-SAP-Applications"]="sle-module-sap-applications"
+                ["Module-SAP-Business-One"]="sle-module-sap-business-one"
+                ["Product-HA"]="sle-ha"
+                ["Product-WE"]="sle-we"
+                ["Module-RT"]="sle-module-rt"
+                ["Module-Server-Applications"]="sle-module-server-applications"
+                ["Module-Transactional-Server"]="sle-module-transactional-server"
+                ["Module-Web-Scripting"]="sle-module-web-scripting"
+            )
+            MODULES=(
+                "Module-Basesystem"           # Name: Basesystem-Module 15.5-0   ID: sle-module-basesystem
+                "Module-Containers"           # Name: Containers-Module 15.5-0  ID: sle-module-containers
+                "Module-Desktop-Applications" # Name: Desktop-Applications-Module 15.5-0  ID: sle-module-desktop-applications
+                "Module-Development-Tools"    # Name: Development-Tools-Module 15.5-0  ID: sle-module-development-tools
+                "Module-HPC"                  # Name: HPC-Module 15.5-0  ID: sle-module-hpc
+                "Module-Legacy"               # Name: Legacy-Module 15.5-0  ID: sle-module-legacy
+                "Module-Live-Patching"        # Name: Live-Patching-Module 15.5-0  ID: sle-module-live-patching
+                "Module-Public-Cloud"         # Name: Public-Cloud-Module 15.5-0  ID: sle-module-public-cloud
+                "Module-Python3"              # Name: Python3-Module 15.5-0  ID: sle-module-python3
+                "Module-SAP-Applications"     # Name: SAP-Applications-Module 15.5-0  ID: sle-module-sap-applications
+                "Module-SAP-Business-One"     # Name: SAP-Business-One-Module 15.5-0  ID: sle-module-sap-business-one
+                "Product-HA"                  # Name: SLEHA15-SP6 15.5-0  ID: sle-ha
+                "Product-WE"                  # Name: SLEWE15-SP6 15.5-0  ID: sle-we
+                "Module-RT"                   # Name: SUSE-Real-Time-Module 15.5-0  ID: sle-module-rt
+                "Module-Server-Applications"  # Name: Server-Applications-Module 15.5-0  ID: sle-module-server-applications
+                "Module-Transactional-Server" # Name: Transactional-Server-Module 15.5-0  ID: sle-module-transactional-server
+                "Module-Web-Scripting"        # Name: Web-Scripting-Module 15.5-0  ID: sle-module-web-scripting
+			)
+            ISO_PATH=/home/iso/$OS_FILENAME_15SP5
+            for module in "${MODULES[@]}"; do
+                module_ID="${MODULE_ID[$module]}"
+                zypper ar "iso:/?iso=${ISO_PATH}&path=/${module}" ${module_ID}
+            done
+            ;;
+        esac
+			
+        # Refresh matadata
+        zypper ref   
+			
+        # Rebuild cache
+        zypper clean
+			
+        # List products	     
+        zypper pd
+
+		   
+        # Mount SCK tool ISO
+        iso_file=$(find "/home/tools/Current_SCK" -name "*.iso") 
+        sudo mount -o loop,ro "$iso_file" /home/cdrom
+			
+        # Install SCK
+        # [Note] Add ISO to PXE boot menu
+        # [Note] Add product.zip after SCK is installed and launched
+        echo
+        echo "--------------------------"
+        echo "INSTALLING TEST CONSOLE..."
+        echo "--------------------------"
+        echo
+        [[ -f /home/cdrom/sck_install.sh ]] && bash /home/cdrom/sck_install.sh
+        if [[ $? == 0 ]]; then
+            echo -e "\n${green}All set! You are okay to go :)${nc}\n"
+            read -p "Launch SCK tool now? (y/n): " LAUNCH
+            while [[ "$LAUNCH" != [YyNn] ]]; do 
+                read -p "Launch SCK tool now? (y/n): " LAUNCH
+            done
+        else
+            echo -e "\n${red}SCK was not installed successfully${nc}\n"
+            exit 1
+        fi
+        [[ $LAUNCH == [Yy] ]] && bash /opt/suse/testKits/bin/testconsole.sh
+        [[ $LAUNCH == [Nn] ]] && exit
+			
+				
+        ## Reconfigure or remove SCK (Uncomment to run if needed)
+        # bash /opt/suse/testKits/system/bin/configinstserver.sh
+
+    #================ SUT ===================
+    elif [[ "$TYPE" == [Ss] ]]; then
+    
+        # Set hostname for SUT
+        ! hostname | grep 'SUT' > /dev/null && hostnamectl set-hostname 'SUT' 
+
+        # Start NTP and sync with TC
+        echo
+        echo "--------------------------"
+        echo "SYNC NTP SERVER WITH TC..."
+        echo "--------------------------"
+        echo
+        systemctl start chronyd
+        systemctl enable chronyd
+        if ! grep -q "server 10.1.1.2 iburst" /etc/chrony.conf; then
+            echo "server 10.1.1.2 iburst" >> /etc/chrony.conf
+        fi
+        sed -i 's/NETCONFIG_NTP_POLICY="auto"/NETCONFIG_NTP_POLICY="Static"/' /etc/sysconfig/network/config
+        sed -i 's/NETCONFIG_NTP_STATIC_SERVERS=""/NETCONFIG_NTP_STATIC_SERVERS="10.1.1.2"/' /etc/sysconfig/network/config
+        netconfig update
+        systemctl restart chronyd
+        chronyc sources
+        chronyc tracking
+			
+		
+        # Set IP and netmask for SUT
+        echo
+        echo "-----------------------------"
+        echo "CONFIGURING SUT NETWORK IP..."
+        echo "-----------------------------"
+        echo
+        declare -A ip_addresses=(
+        ["eth0"]="10.1.1.1"
+        ["eth1"]="10.1.2.1"
+        ["eth2"]="10.1.3.1"
+        ["eth3"]="10.1.4.1"
+        )
+        NETMASK="24"
+        for interface in eth0 eth1 eth2 eth3; do 
+            if ip a | grep -q $interface; then
+                CONFIG_FILE="/etc/sysconfig/network/ifcfg-$interface"
+                IPADDR=${ip_addresses[$interface]}  
+                # Check if the IP and netmask have been correctly set to avoid repeating
+                if [[ -f "$CONFIG_FILE" ]]; then
+                    current_ip=$(cat "$CONFIG_FILE" | grep 'IPADDR' | awk -F "'" '{print $2}')
+                    if [[ "$current_ip" == "$IPADDR/$NETMASK" ]]; then
+                        continue
+                    else
+                        rm -f "$CONFIG_FILE"
+                    fi
+                fi
+                echo "Configuring $interface with IP $IPADDR" 
+                echo "IPADDR='$IPADDR/$NETMASK'" | sudo tee -a "$CONFIG_FILE" > /dev/null
+                echo "BOOTPROTO='static'" | sudo tee -a "$CONFIG_FILE" > /dev/null
+                echo "STARTMODE='auto'" | sudo tee -a "$CONFIG_FILE" > /dev/null
+                sudo systemctl restart network
+            fi
+        done  
+		
+        # Install ipmctl tool on SUT and configure PMEMs
+        echo
+        echo "---------------------"
+        echo "CONFIGURING PMEMS...."
+        echo "---------------------"
+        echo
+        [[ ! -f /usr/bin/ipmctl ]] && zypper --non-interactive install ipmctl
+        ipmctl show -dimm && ipmctl show -memoryresources && ipmctl show -region && ipmctl create -goal PersistentMemoryType=AppDirect
+			
+        # Create namespace
+        while true; do
+            ndctl create-namespace --mode=fsdax
+            if [[ $? != 0 ]]; then
+                break
+            fi
+        done
+        # Check if at least one PMEM device exists
+        if find /dev/pmem* -maxdepth 0 -print -quit 2>/dev/null; then
+            for pmem_device in /dev/pmem*; do
+                pmem_id=$(echo "$pmem_device" | grep -oE '^/dev/pmem([0-9]+)$' | cut -d'm' -f2)
+                if [[ -n "$pmem_id" ]]; then
+                    if ! mkfs.xfs "$pmem_device"; then
+                        echo -e "${red}Failed to create filesystem on $pmem_device${nc}"
+                        exit 1
+                    fi
+                    mkdir -p "/mnt/pmem$pmem_id" # Quoting is important here!
+                    if [[ $? != 0 ]]; then
+                        echo -e "${red}Failed to create mount point /mnt/pmem$pmem_id${nc}"
+                        exit 1
+                    fi
+                    echo "$pmem_device /mnt/pmem$pmem_id xfs defaults 0 0" >> /etc/fstab
+                    if ! mount "/mnt/pmem$pmem_id"; then
+                        echo -e "${red}Failed to mount $pmem_device${nc}"
+                        exit 1
+                    fi
+                fi
+            done
+        else  
+            echo "PMEM devices not found. Skipping to create namespace..."
+        fi
+        [[ $? == 0 ]] && echo -e "\n${green}All set! You are okay to go :)${nc}\n"
+    fi	
+	
 fi
 
 exit
