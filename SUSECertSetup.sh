@@ -30,7 +30,7 @@ __version__="1.0"
 #    d) Make the machine a DHCP/PXE server -> yes
 #    e) Select the nic used to serve DHCP -> eth0
 #    f) Change the dhcp available address range -> No
-#    g) Ensure the local ISO image is added to the PXE install menu 
+#    g) Add new PXE install menu items from local ISO image
 
 # Prerequisites for SUT:
 # PXE boot
@@ -417,6 +417,8 @@ else
         netconfig update
         systemctl restart chronyd
         chronyc sources
+        # Wait 5 secs for NTP to sync
+        sleep 5
         chronyc tracking
         [[ $? == 0 ]] && echo -e "\n${green}Done.${nc}\n"
 			
@@ -481,7 +483,7 @@ else
                         echo -e "${red}Failed to create filesystem on $pmem_device${nc}"
                         exit 1
                     fi
-                    mkdir -p "/mnt/pmem$pmem_id" # Quoting is important here!
+                    mkdir -p "/mnt/pmem$pmem_id"
                     if [[ $? != 0 ]]; then
                         echo -e "${red}Failed to create mount point /mnt/pmem$pmem_id${nc}"
                         exit 1
