@@ -2,15 +2,15 @@
 
 
 # CREATOR: Mike Lu (klu7@lenovo.com)
-# CHANGE DATE: 2/6/2025
+# CHANGE DATE: 2/7/2025
 __version__="1.0"
 
 
 # SUSE Enterprise Linux Server Hardware Certification Test Environment Setup Script
-# [Note] The OS version on TC MUST be older than SUT (for example: TC: 15-SP5   SUT: 15-SP6)
+# [Note] The OS version installed on TC MUST be older than the SUT (for example: TC: 15-SP5   SUT: 15-SP6)
 
 # Prerequisites for TC:
-# Boot to GM ISO
+# Boot to GM (n-1) ISO
 #    a) Select "SUSE Linux Enterprise Server" to install
 #    b) Skip Registration
 #    c) Select the following 5 modules/extensions
@@ -20,27 +20,35 @@ __version__="1.0"
 #         - SUSE Linux Enterprise Workstation Extension
 #         - Server Application Module
 #    d) Skip User creation
-#    e) Set root password: suse
+#    e) Set root password -> suse
 # Boot to OS
 #    a) Put all the tools (OS ISO/product.zip/Current_SCK.zip) to the same directory as this script
+# SCK installation prompt
+#    a) Enter the TestConsole's IP address -> 10.1.1.2
+#    b) Select installation type option -> TC
+#    c) Set SMB password -> suse
+#    d) Make the machine a DHCP/PXE server -> yes
+#    e) Select the nic used to serve DHCP -> eth0
+#    f) Change the dhcp available address range -> No
+#    g) Ensure the local ISO image is added to the PXE install menu 
 
 # Prerequisites for SUT:
-# PXE boot to TC
-#    a) Select "Server single disk automated install"
+# PXE boot
+#    a) Select option "Server single disk automated install"
 
 
 
 # User-defined settings
 TIME_ZONE='Asia/Taipei'
-SCK_URL='http://sdk.suse.com/ndk/systest/builds/current/Current_SCK.zip'
-Products_URL='http://sdk.suse.com/ndk/certfiles/products.zip'
-SCK_FILENAME="Current_SCK.zip"
-Products_FILENAME="products.zip"
 OS_FILENAME_15SP5="SLE-15-SP5-Full-x86_64-GM-Media1.iso"
 OS_FILENAME_15SP6="SLE-15-SP6-Full-x86_64-GM-Media1.iso"
 
 
 # Fixed settings
+SCK_URL='http://sdk.suse.com/ndk/systest/builds/current/Current_SCK.zip'
+Products_URL='http://sdk.suse.com/ndk/certfiles/products.zip'
+SCK_FILENAME="Current_SCK.zip"
+Products_FILENAME="products.zip"
 red='\e[41m'
 green='\e[32m'
 yellow='\e[93m'
@@ -106,6 +114,7 @@ else
  
     # Set local time zone and reset NTP
     timedatectl set-timezone $TIME_ZONE
+    ln -sf /usr/share/zoneinfo/$TIME_ZONE /etc/localtime
     timedatectl set-ntp 0 && sleep 1 && timedatectl set-ntp 1
 
 
@@ -124,18 +133,18 @@ else
     echo "│    SLES YES Certification Test Environment Setup      │"
     echo "╰───────────────────────────────────────────────────────╯"
     echo "Are you setting up a SUT or TC?"
-    read -p "(s)SUT  (t)TC: " TYPE
+    read -p "(S)SUT   (T)TC: " TYPE
     while [[ "$TYPE" != [SsTt] ]]; do 
-        read -p "(s)SUT  (t)TC: " TYPE
+        read -p "(S)SUT   (T)TC: " TYPE
     done   
     
 	
     #================ TC ===================
     if [[ "$TYPE" == [Tt] ]]; then
         echo "Which OS version are you going to certify for SUT?"
-        read -p "(1)15 SP6  (2)15 SP5: " SUT_OS_VER
+        read -p "(1)15 SP6   (2)15 SP5: " SUT_OS_VER
         while [[ "$SUT_OS_VER" != [12] ]]; do 
-            read -p "(1)15 SP6  (2)15 SP5: " SUT_OS_VER
+            read -p "(1)15 SP6   (2)15 SP5: " SUT_OS_VER
         done
 
 
@@ -176,6 +185,7 @@ else
                 sudo systemctl restart network
             fi
         done
+        [[ $? == 0 ]] && echo -e "\n${green}Done.${nc}\n"
 
         # Move or download required tools
         echo
@@ -217,7 +227,7 @@ else
                 fi
             fi
         fi
-	
+	    [[ $? == 0 ]] && echo -e "\n${green}Done.${nc}\n"
 	
         # Unzip SCK.zip and products.zip files
         find "/home/tools/" -name "*.zip" -exec unzip -q -o {} -d "/home/tools/" \;
@@ -238,6 +248,7 @@ else
                 break
             fi
         done
+        [[ $? == 0 ]] && echo -e "\n${green}Done.${nc}\n"
 		
 		
         # Add local ISO image to repo
@@ -248,6 +259,7 @@ else
         echo
         case $SUT_OS_VER in		
         "1") # 15 SP6
+            ISO_PATH=/home/iso/$OS_FILENAME_15SP6
             declare -A MODULE_ID
             MODULE_ID=(
                 ["Module-Basesystem"]="sle-module-basesystem"
@@ -269,33 +281,27 @@ else
                 ["Module-Web-Scripting"]="sle-module-web-scripting"
             )
             MODULES=(
-                "Module-Basesystem"           # Name: Basesystem-Module 15.6-0   ID: sle-module-basesystem
-                "Module-Containers"           # Name: Containers-Module 15.6-0  ID: sle-module-containers
-                "Module-Desktop-Applications" # Name: Desktop-Applications-Module 15.6-0  ID: sle-module-desktop-applications
-                "Module-Development-Tools"    # Name: Development-Tools-Module 15.6-0  ID: sle-module-development-tools
-                "Module-HPC"                  # Name: HPC-Module 15.6-0  ID: sle-module-hpc
-                "Module-Legacy"               # Name: Legacy-Module 15.6-0  ID: sle-module-legacy
-                "Module-Live-Patching"        # Name: Live-Patching-Module 15.6-0  ID: sle-module-live-patching
-                "Module-Public-Cloud"         # Name: Public-Cloud-Module 15.6-0  ID: sle-module-public-cloud
-                "Module-Python3"              # Name: Python3-Module 15.6-0  ID: sle-module-python3
-                "Module-SAP-Applications"     # Name: SAP-Applications-Module 15.6-0  ID: sle-module-sap-applications
-                "Module-SAP-Business-One"     # Name: SAP-Business-One-Module 15.6-0  ID: sle-module-sap-business-one
-                "Product-HA"                  # Name: SLEHA15-SP6 15.6-0  ID: sle-ha
-                "Product-WE"                  # Name: SLEWE15-SP6 15.6-0  ID: sle-we
-                "Module-RT"                   # Name: SUSE-Real-Time-Module 15.6-0  ID: sle-module-rt
-                "Module-Server-Applications"  # Name: Server-Applications-Module 15.6-0  ID: sle-module-server-applications
-                "Module-Transactional-Server" # Name: Transactional-Server-Module 15.6-0  ID: sle-module-transactional-server
-                "Module-Web-Scripting"        # Name: Web-Scripting-Module 15.6-0  ID: sle-module-web-scripting
+                "Module-Basesystem"           # Name: Basesystem-Module 15.6-0   
+                "Module-Containers"           # Name: Containers-Module 15.6-0  
+                "Module-Desktop-Applications" # Name: Desktop-Applications-Module 15.6-0  
+                "Module-Development-Tools"    # Name: Development-Tools-Module 15.6-0  
+                "Module-HPC"                  # Name: HPC-Module 15.6-0  
+                "Module-Legacy"               # Name: Legacy-Module 15.6-0  
+                "Module-Live-Patching"        # Name: Live-Patching-Module 15.6-0  
+                "Module-Public-Cloud"         # Name: Public-Cloud-Module 15.6-0
+                "Module-Python3"              # Name: Python3-Module 15.6-0
+                "Module-SAP-Applications"     # Name: SAP-Applications-Module 15.6-0
+                "Module-SAP-Business-One"     # Name: SAP-Business-One-Module 15.6-0
+                "Product-HA"                  # Name: SLEHA15-SP6 15.6-0 
+                "Product-WE"                  # Name: SLEWE15-SP6 15.6-0
+                "Module-RT"                   # Name: SUSE-Real-Time-Module 15.6-0
+                "Module-Server-Applications"  # Name: Server-Applications-Module 15.6-0
+                "Module-Transactional-Server" # Name: Transactional-Server-Module 15.6-0
+                "Module-Web-Scripting"        # Name: Web-Scripting-Module 15.6-0
             )
-            ISO_PATH=/home/iso/$OS_FILENAME_15SP6
-            MOUNT_POINT=/run/media/root
-            mount "$ISO_PATH" "$MOUNT_POINT"
-            for module in "${MODULES[@]}"; do
-                module_ID="${MODULE_ID[$module]}"
-                zypper ar "dir:${MOUNT_POINT}/${module}" ${module_ID}
-            done
             ;;
         "2") # 15 SP5
+            ISO_PATH=/home/iso/$OS_FILENAME_15SP5
             declare -A MODULE_ID
             MODULE_ID=(
                 ["Module-Basesystem"]="sle-module-basesystem"
@@ -317,34 +323,37 @@ else
                 ["Module-Web-Scripting"]="sle-module-web-scripting"
             )
             MODULES=(
-                "Module-Basesystem"           # Name: Basesystem-Module 15.5-0   ID: sle-module-basesystem
-                "Module-Containers"           # Name: Containers-Module 15.5-0  ID: sle-module-containers
-                "Module-Desktop-Applications" # Name: Desktop-Applications-Module 15.5-0  ID: sle-module-desktop-applications
-                "Module-Development-Tools"    # Name: Development-Tools-Module 15.5-0  ID: sle-module-development-tools
-                "Module-HPC"                  # Name: HPC-Module 15.5-0  ID: sle-module-hpc
-                "Module-Legacy"               # Name: Legacy-Module 15.5-0  ID: sle-module-legacy
-                "Module-Live-Patching"        # Name: Live-Patching-Module 15.5-0  ID: sle-module-live-patching
-                "Module-Public-Cloud"         # Name: Public-Cloud-Module 15.5-0  ID: sle-module-public-cloud
-                "Module-Python3"              # Name: Python3-Module 15.5-0  ID: sle-module-python3
-                "Module-SAP-Applications"     # Name: SAP-Applications-Module 15.5-0  ID: sle-module-sap-applications
-                "Module-SAP-Business-One"     # Name: SAP-Business-One-Module 15.5-0  ID: sle-module-sap-business-one
-                "Product-HA"                  # Name: SLEHA15-SP6 15.5-0  ID: sle-ha
-                "Product-WE"                  # Name: SLEWE15-SP6 15.5-0  ID: sle-we
-                "Module-RT"                   # Name: SUSE-Real-Time-Module 15.5-0  ID: sle-module-rt
-                "Module-Server-Applications"  # Name: Server-Applications-Module 15.5-0  ID: sle-module-server-applications
-                "Module-Transactional-Server" # Name: Transactional-Server-Module 15.5-0  ID: sle-module-transactional-server
-                "Module-Web-Scripting"        # Name: Web-Scripting-Module 15.5-0  ID: sle-module-web-scripting
+                "Module-Basesystem"           # Name: Basesystem-Module 15.5-0
+                "Module-Containers"           # Name: Containers-Module 15.5-0
+                "Module-Desktop-Applications" # Name: Desktop-Applications-Module 15.5-0
+                "Module-Development-Tools"    # Name: Development-Tools-Module 15.5-0
+                "Module-HPC"                  # Name: HPC-Module 15.5-0
+                "Module-Legacy"               # Name: Legacy-Module 15.5-0
+                "Module-Live-Patching"        # Name: Live-Patching-Module 15.5-0
+                "Module-Public-Cloud"         # Name: Public-Cloud-Module 15.5-0
+                "Module-Python3"              # Name: Python3-Module 15.5-0
+                "Module-SAP-Applications"     # Name: SAP-Applications-Module 15.5-0
+                "Module-SAP-Business-One"     # Name: SAP-Business-One-Module 15.5-0
+                "Product-HA"                  # Name: SLEHA15-SP6 15.5-0
+                "Product-WE"                  # Name: SLEWE15-SP6 15.5-0
+                "Module-RT"                   # Name: SUSE-Real-Time-Module 15.5-0
+                "Module-Server-Applications"  # Name: Server-Applications-Module 15.5-0
+                "Module-Transactional-Server" # Name: Transactional-Server-Module 15.5-0
+                "Module-Web-Scripting"        # Name: Web-Scripting-Module 15.5-0
             )
-            ISO_PATH=/home/iso/$OS_FILENAME_15SP5
-            MOUNT_POINT=/run/media/root
-            mount "$ISO_PATH" "$MOUNT_POINT"
-            for module in "${MODULES[@]}"; do
-                module_ID="${MODULE_ID[$module]}"
-                zypper ar "dir:${MOUNT_POINT}/${module}" ${module_ID}
-            done
             ;;
         esac
-			
+        
+        MOUNT_POINT=/mnt/iso
+        # Unmount existing OS ISO
+        umount "$MOUNT_POINT" 2> /dev/null
+        mkdir -p "$MOUNT_POINT"
+        mount "$ISO_PATH" "$MOUNT_POINT" || { echo -e "${red}Mount OS ISO failed!${nc}"; exit 1; } 
+        for module in "${MODULES[@]}"; do
+            module_ID="${MODULE_ID[$module]}"
+            zypper ar "dir:${MOUNT_POINT}/${module}" ${module_ID} || { echo -e "${red}zypper ar failed for $module${nc}"; exit 1; }
+        done
+        
         # Refresh matadata
         zypper ref   
 			
@@ -353,17 +362,14 @@ else
 			
         # List products	     
         zypper pd
-        
-        # Unmount OS ISO
-        # umount "$MOUNT_POINT" 2> /dev/null
-		   
+        [[ $? == 0 ]] && echo -e "\n${green}Done.${nc}\n"
+
         # Mount SCK tool ISO
         iso_file=$(find "/home/tools/Current_SCK" -name "*.iso") 
         sudo mount -o loop,ro "$iso_file" /home/cdrom
 			
         # Install SCK
-        # [Note] Add ISO to PXE boot menu
-        # [Note] Add product.zip after SCK is installed and launched
+        # [Note] Manually add product.zip (path: /home/tools) after SCK is launched
         echo
         echo "--------------------------"
         echo "INSTALLING TEST CONSOLE..."
@@ -371,6 +377,7 @@ else
         echo
         [[ -f /home/cdrom/sck_install.sh ]] && bash /home/cdrom/sck_install.sh
         if [[ $? == 0 ]]; then
+            systemctl restart chronyd
             echo -e "\n${green}All set! You are okay to go :)${nc}\n"
             read -p "Launch SCK tool now? (y/n): " LAUNCH
             while [[ "$LAUNCH" != [YyNn] ]]; do 
@@ -386,6 +393,7 @@ else
 				
         ## Reconfigure or remove SCK (Uncomment to run if needed)
         # bash /opt/suse/testKits/system/bin/configinstserver.sh
+               
 
     #================ SUT ===================
     elif [[ "$TYPE" == [Ss] ]]; then
@@ -401,8 +409,8 @@ else
         echo
         systemctl start chronyd
         systemctl enable chronyd
-        if ! grep -q "server 10.1.1.2 iburst" /etc/chrony.conf; then
-            echo "server 10.1.1.2 iburst" >> /etc/chrony.conf
+        if ! grep -q "server 10.1.1.2 iburst prefer" /etc/chrony.conf; then
+            echo "server 10.1.1.2 iburst prefer" >> /etc/chrony.conf
         fi
         sed -i 's/NETCONFIG_NTP_POLICY="auto"/NETCONFIG_NTP_POLICY="Static"/' /etc/sysconfig/network/config
         sed -i 's/NETCONFIG_NTP_STATIC_SERVERS=""/NETCONFIG_NTP_STATIC_SERVERS="10.1.1.2"/' /etc/sysconfig/network/config
@@ -410,6 +418,7 @@ else
         systemctl restart chronyd
         chronyc sources
         chronyc tracking
+        [[ $? == 0 ]] && echo -e "\n${green}Done.${nc}\n"
 			
 		
         # Set IP and netmask for SUT
@@ -444,7 +453,8 @@ else
                 echo "STARTMODE='auto'" | sudo tee -a "$CONFIG_FILE" > /dev/null
                 sudo systemctl restart network
             fi
-        done  
+        done
+        [[ $? == 0 ]] && echo -e "\n${green}Done.${nc}\n"        
 		
         # Install ipmctl tool on SUT and configure PMEMs
         echo
