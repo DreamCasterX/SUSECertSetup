@@ -2,7 +2,7 @@
 
 
 # CREATOR: Mike Lu (klu7@lenovo.com)
-# CHANGE DATE: 2/7/2025
+# CHANGE DATE: 2/10/2025
 __version__="1.0"
 
 
@@ -133,9 +133,9 @@ else
     echo "│    SLES YES Certification Test Environment Setup      │"
     echo "╰───────────────────────────────────────────────────────╯"
     echo "Are you setting up a SUT or TC?"
-    read -p "(S)SUT   (T)TC: " TYPE
+    read -p "(s)SUT   (t)TC: " TYPE
     while [[ "$TYPE" != [SsTt] ]]; do 
-        read -p "(S)SUT   (T)TC: " TYPE
+        read -p "(s)SUT   (t)TC: " TYPE
     done   
     
 	
